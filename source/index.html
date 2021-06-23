@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PPPOE IP更換程式</title>
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+  </head>
+  <body>
+	<div class="container-fluid">
+		<div class="form-horizontal col-12" role="form">
+			<div class="col-12 input-p">
+			  <h4>PPPOE IP更換程式</h4>
+			</div>
+			<div class="form-group">
+				<div class="col-12">
+					<button id="call" type="button" class="btn btn-success col-12">更換IP</button>
+				</div>
+			</div>
+			<div class="form-group col-12 justify-content-center">
+				<button id="setting" type="button" class="btn btn-danger" data-toggle="modal" data-target="#setbox">基本設定</button>
+				<button id="get_ip" type="button" class="btn btn-primary">目前IP</button>
+				<button id="about" type="button" class="btn btn-info">關於本程式</button>
+			</div>
+		</div>
+		
+		<div class="form-group col-12">
+			<label for="info">狀態資訊</label>
+			<select multiple class="form-control" id="info" size="11">
+			</select>
+		</div>
+	</div>
+	
+	<div class="modal" tabindex="-1" role="dialog" id="setbox">
+	  <div class="modal-dialog modal-dialog-centered" role="document">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">基本資料設定</h5>
+			<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+			  <span aria-hidden="true">&times;</span>
+			</button>
+		  </div>
+		  <div class="modal-body">
+			<div class="form-group">
+				<label for="time" class="col-12 control-label">IP鎖定時間(小時)</label>
+				<div class="col-12 input-p">
+				  <input type="number" class="form-control save" id="time"  min="1" placeholder="幾小時後清除使用過的IP">
+				</div>
+				<label for="name" class="col-12 control-label">撥號名稱</label>
+				<div class="col-12 input-p">
+				  <input type="text" class="form-control save" id="name" placeholder="電腦撥號名稱">
+				</div>
+				<label for="account" class="col-12 control-label">帳號</label>
+				<div class="col-12 input-p">
+				  <input type="text" class="form-control save" id="account" placeholder="Hinet帳號要含@hinet.net">
+				</div>
+				<label for="account" class="col-12 control-label">密碼</label>
+				<div class="col-12 input-p">
+				  <input type="password" class="form-control save" id="password" placeholder="Hinet密碼">
+				</div>
+			</div>
+		  </div>
+		</div>
+	  </div>
+	</div>
+	
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+	<script>
+		let version = '1.0';
+		
+		// 日期格式擴充
+		Date.prototype.format = function(format) {
+		   let date = {
+				  "M+": this.getMonth() + 1,
+				  "d+": this.getDate(),
+				  "h+": this.getHours(),
+				  "m+": this.getMinutes(),
+				  "s+": this.getSeconds(),
+				  "q+": Math.floor((this.getMonth() + 3) / 3),
+				  "S+": this.getMilliseconds()
+		   };
+		   if (/(y+)/i.test(format)) {
+				  format = format.replace(RegExp.$1, (this.getFullYear() + '').substr(4 - RegExp.$1.length));
+		   }
+		   for (let k in date) {
+				  if (new RegExp("(" + k + ")").test(format)) {
+						 format = format.replace(RegExp.$1, RegExp.$1.length == 1
+								? date[k] : ("00" + date[k]).substr(("" + date[k]).length));
+				  }
+		   }
+		   return format;
+		}
+		
+		// 程式初始
+		$(function() {
+			init_page();
+			let check_ip = async () => {
+				let ip = await get_ip();
+				save_ip(ip);
+				$('#info').scrollTop(0);
+			};
+			check_ip();
+		});
+		
+		// 設定頁面資訊
+		function init_page(){
+			if( localStorage.getItem("time") == null ){
+				$('#time').val( 1 );
+			}else{
+				$('#time').val( localStorage.getItem("time") );
+			}
+			$('#name').val( localStorage.getItem("name") );
+			$('#account').val( localStorage.getItem("account") );
+			$('#password').val( localStorage.getItem("password") );
+			
+			let x,y;
+			x = screen.availWidth - 370;
+			y = screen.availHeight - 490;
+			window.moveTo(x, y);
+			$('#about').trigger('click');
+		}
+		
+		// 確認是否有值
+		function is_empty(val){
+			if(val == '' || val == null){
+				return true;
+			}else{
+				return false;
+			}
+		}
+		
+		// 開始更換IP
+		async function change_ip(){
+			let time = localStorage.getItem("time");
+			let name = localStorage.getItem("name");
+			let account = localStorage.getItem("account");
+			let password = localStorage.getItem("password");
+			
+			if( is_empty(time) || is_empty(name) || is_empty(account) || is_empty(password)){
+				//alert('請先至基本設定填寫資料');
+				clear_info();
+				add_info('請先至基本設定填寫資料!!!;alert-danger');
+				add_info('請先至基本設定填寫資料!!!;alert-danger');
+				add_info('請先至基本設定填寫資料!!!;alert-danger');
+				return 0;
+			}
+		
+			time = new Date().format('yyyy/MM/dd hh:mm:ss');
+			add_info([time, '偵測IP中請稍後...']);
+			
+			let discon = await disconnect()
+			time = new Date().format('yyyy/MM/dd hh:mm:ss');
+			discon = discon.split('\n');
+			discon.unshift(time);
+			if(discon[1] == '命令已成功完成。') discon[1] = '強制斷線...';
+			add_info(discon);
+			
+			let conn = await connect();
+			time = new Date().format('yyyy/MM/dd hh:mm:ss');
+			conn = conn.split('\n');
+			conn.unshift(time);
+			add_info(conn);
+			
+			let ip = await get_ip();
+			time = new Date().format('yyyy/MM/dd hh:mm:ss');
+			if( compare_ip(ip) == true){
+				console.log('IP重複重新撥號...');
+				add_info('IP重複重新撥號...;alert-danger');
+				change_ip();
+			}else{
+				save_ip(ip);
+				console.log('IP更換成功!!!');
+				add_info('IP更換成功!!!;alert-success');
+			}
+		}
+		
+		// 斷線
+		function disconnect(){
+			return new Promise((resolve, reject) => {
+				const iconv = require('iconv-lite');
+				const { exec } = require('child_process');
+				let name = localStorage.getItem("name");
+				let disconnect_cmd = "rasdial " + name + " /D";
+				exec( disconnect_cmd, { encoding: 'buffer' }, (error, stdout, stderr) => {
+					if (error) {
+						console.log('error', iconv.decode(error, 'big5'));
+						reject(iconv.decode(error, 'big5'));
+					}else{
+						console.log('stdout', iconv.decode(stdout, 'big5'));
+						resolve(iconv.decode(stdout, 'big5'));
+						//console.log('stderr', iconv.decode(stderr, 'big5'));
+					}
+				});	
+			});
+		}
+		
+		// 進行撥號
+		function connect(){
+			return new Promise((resolve, reject) => {
+				const iconv = require('iconv-lite');
+				const { exec } = require('child_process');
+				let name = localStorage.getItem("name");
+				let account = localStorage.getItem("account");
+				let password = localStorage.getItem("password");
+				let call_cmd = "rasdial " + name + " " + account + " " + password;
+				exec( call_cmd, { encoding: 'buffer' }, async (error, stdout, stderr) => {
+					if (error) {
+						console.log('error', iconv.decode(error, 'big5'));
+						reject(iconv.decode(error, 'big5'));
+					}else{
+						console.log('stdout', iconv.decode(stdout, 'big5'));
+						resolve(iconv.decode(stdout, 'big5'));
+					}
+				});
+			});
+		}
+		
+		// 比較IP是否重複
+		function compare_ip(ip){
+			let ip_pool = get_ip_pool();
+			if (ip in ip_pool){
+				return true;
+			}else {
+				return false;
+			}
+		}
+		
+		
+		//取得現在IP
+		function get_ip(){
+			return new Promise((resolve, reject) => {
+				$.ajax({
+					type: "GET",
+					url: 'https://ipinfo.io/ip',
+					crossDomain: true,
+					success: function (data) {
+						//$('#ip').text(data);
+						let time = new Date().format('yyyy/MM/dd hh:mm:ss');
+						add_info([time, '目前IP為: '+ data +';alert-success']);
+						resolve(data);
+					},
+					error: function (xhr, ajaxOptions, thrownError) {
+						console.log('xHR: ' + xhr);
+						console.log('ajaxOption: ' + ajaxOptions);
+						console.log('thrownError: ' + thrownError);
+						reject(thrownError);
+					}
+				});
+			});
+		}
+		
+		// 取得歷史IP
+		function get_ip_pool(){
+			let ip_pool = localStorage.getItem("ip_pool");
+			if(ip_pool != null)
+				return ip_pool = clear_ip_pool(JSON.parse(ip_pool));
+			else
+				return {};
+		}
+		
+		// 儲存現在IP
+		function save_ip(ip){
+			let ip_pool = get_ip_pool();
+			let time = new Date().format('yyyy/MM/dd hh:mm:ss');
+			ip_pool[ip]={'time': time, 'ip': ip, 'datetime': new Date()};
+			set_ip_pool(ip_pool);
+		}
+		
+		// 儲存所有IP
+		function set_ip_pool(ip_pool){
+			//ip_pool = clear_ip_pool(ip_pool);
+			return localStorage.setItem('ip_pool', JSON.stringify(ip_pool));
+		}
+		
+		// 清除過期IP
+		function clear_ip_pool(ip_pool){
+			//let ip_pool = get_ip_pool();
+			let r = [];
+			let now = new Date();
+			let time = localStorage.getItem("time")*1;
+			for (let ip in ip_pool) {
+				if( now - new Date(ip_pool[ip]['datetime']) > time *60*60*1000 ){
+					r.push(ip);
+				}
+			}
+			for(let i=0; i<r.length; i++){
+				delete ip_pool[ r[i] ];
+			}
+			//set_ip_pool(ip_pool);
+			return ip_pool;
+		}
+		
+		function add_info(str){
+			let html = "";
+			let tmp = "";
+			if(typeof(str) == "object"){
+				for(let i=0; i < str.length; i++){
+					if( str[i] != ''){
+						tmp = str[i].split(';');
+						if(tmp.length > 1){
+							html += '<option class="'+tmp[1]+'">'+ tmp[0] +'</option>';
+						}else{
+							html += '<option>'+ str[i] +'</option>';
+						}
+					}
+				}
+			}else{
+				tmp = str.split(';');
+				if(tmp.length > 1){
+					html += '<option class="'+tmp[1]+'">'+ tmp[0] +'</option>';
+				}else{
+					html += '<option>'+ str +'</option>';
+				}
+			}
+			$('#info').append(html);
+			let select = $('#info');
+			let option = select.find("option:last"); 
+			let optionTop = option.offset().top 
+			let selectTop = select.offset().top; 
+			select.scrollTop(select.scrollTop() + (optionTop - selectTop)); 
+		}
+		
+		function clear_info(){
+			$('#info').html('');
+			$('#info').scrollTop(0);
+		}
+		
+		// click change IP
+		$('#call').click(function(){
+			change_ip();
+		});
+		
+		
+		// click get IP
+		$('#get_ip').click(function(){
+			get_ip();
+		});
+		
+		// click about
+		$('#about').click(function(){
+			let info = [];
+			info.push('程式版本: v'+ version+';alert-primary');
+			info.push('作者: jikker'+';alert-success');
+			info.push('Email: git'+ 'hub@jik' + 'ker.net;alert-danger');
+			info.push('Github: https://github.com/jikker;alert-warning github');
+			info.push('程式授權: WTFPL;alert-info');
+			info.push('喜歡的話github幫忙點個star!;alert-dark');
+			info.push('程式說明：;alert-primary');
+			info.push('本程式為Hinet PPPOE撥號專用;alert-primary');
+			info.push('利用PPPOE斷線重撥能夠拿到不同IP;alert-primary');
+			info.push('的原理，自動偵測是否與近期IP相符;alert-primary');
+			info.push('弱相同會自動重撥。;alert-primary');
+			info.push('先至設定填寫資料，再按下更換IP;alert-primary');
+			info.push('等待IP更換完成;alert-primary');
+			info.push('本程式只支援Windows 10以上系統;alert-primary');
+			clear_info();
+			add_info(info);
+			$('#info').scrollTop(0);
+		});
+		
+		$('#info').change(function(){
+			if( $(this).val() == 'Github: https://github.com/jikker'){
+				let open = require("open");
+				open("https://github.com/jikker/pppoe_ip_change", "chrome");
+			}else if( $(this).val() == 'Email: github@jikker.net'){
+				location.href='mailto:github@jikker.net';
+			}
+		});
+		
+		// text change
+		$('.save').change(function(){
+			let id = $(this).attr('id');
+			localStorage.setItem(id, $(this).val());
+		});
+		
+	</script>
+  </body>
+</html>

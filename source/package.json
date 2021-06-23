@@ -1,0 +1,16 @@
+{
+  "name": "nw-demo",
+  "main": "index.html",
+  "window": {
+    "title": "PPPOE IP更換程式",
+    "toolbar": false,
+    "width": 370,
+    "height": 490,
+	"resizable": false
+  },
+  "dependencies": {
+    "iconv-lite": "^0.6.3",
+    "node-fetch": "^2.6.1",
+    "open": "^8.2.1"
+  }
+}
